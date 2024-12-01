@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="ka">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>თამაში: მუქი სტილი</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background: #1a1a1a; /* მუქი ნაცრისფერი */
+        }
+
+        #rotate-message {
+            display: none;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 24px;
+            color: white;
+            font-family: Arial, sans-serif;
+            text-align: center;
+        }
+
+        canvas {
+            display: block;
+            background-image:url(stars.gif);
+            background-size: 100%;
+            filter: blur(0.5px);
+          
+        }
+
+        .control {
+            position: absolute;
+            width: 80px;
+            height: 80px;
+            background: rgba(255, 255, 255, 0.1);
+            border: 2px solid rgba(255, 255, 255, 0.5);
+            border-radius: 50%;
+            touch-action: none;
+            backdrop-filter: blur(10px);
+        }
+
+        #left-control {
+            bottom: 20px;
+            left: 20px;
+        }
+
+        #right-control {
+            bottom: 20px;
+            left: 120px;
+        }
+
+        #jump-control {
+            bottom: 20px;
+            right: 20px;
+        }
+        /* CSS */
+.button-31 {
+  background-color: #222;
+  border-radius: 4px;
+  border-style: none;
+  box-sizing: border-box;
+  color: #fff;
+  cursor: pointer;
+  display: inline-block;
+  font-family: "Farfetch Basis","Helvetica Neue",Arial,sans-serif;
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1.5;
+  margin: 0;
+  max-width: none;
+  min-height: 44px;
+  min-width: 10px;
+  outline: none;
+  overflow: hidden;
+  padding: 9px 20px 8px;
+  position: relative;
+  text-align: center;
+  text-transform: none;
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: manipulation;
+  width: 100%;
+}
+
+.button-31:hover,
+.button-31:focus {
+  opacity: .75;
+}
+    </style>
+</head>
+<body>
+  <audio src="bgms.mp3" autoplay loop></p>
+</audio>
+    <div id="rotate-message">გთხოვთ, გადმოაბრუნეთ ტელეფონი</div>
+    <canvas id="gameCanvas"></canvas>
+    <!-- HTML !-->
+    <a href="index.html">
+<button class="button-31" role="button">მთავარ გვერდზე დაბრუნება</button></a>
+    <div id="left-control" class="control"></div>
+    <div id="right-control" class="control"></div>
+    <div id="jump-control" class="control"></div>
+    <script>
+        const canvas = document.getElementById("gameCanvas");
+        const ctx = canvas.getContext("2d");
+        const rotateMessage = document.getElementById("rotate-message");
+
+        // თაჩ კონტროლები
+        const leftControl = document.getElementById("left-control");
+        const rightControl = document.getElementById("right-control");
+        const jumpControl = document.getElementById("jump-control");
+
+        let keys = { left: false, right: false };
+        let jumpCount = 0;
+
+        function checkOrientation() {
+            if (window.innerWidth < window.innerHeight) {
+                rotateMessage.style.display = "block";
+                canvas.style.display = "none";
+                leftControl.style.display = "none";
+                rightControl.style.display = "none";
+                jumpControl.style.display = "none";
+            } else {
+                rotateMessage.style.display = "none";
+                canvas.style.display = "block";
+                leftControl.style.display = "block";
+                rightControl.style.display = "block";
+                jumpControl.style.display = "block";
+                startGame();
+            }
+        }
+
+        window.addEventListener("resize", checkOrientation);
+        checkOrientation();
+
+        let player, obstacles, score, bestScore, particles;
+        const gravity = 0.8;
+
+        function initializeGame() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+
+            player = {
+                x: 100,
+                y: canvas.height - 100,
+                width: 50,
+                height: 50,
+                color: "#FFFFFF",
+                velocityY: 0,
+                glow: "#FFFFFF",
+            };
+
+            obstacles = [];
+            particles = [];
+            score = 0;
+            bestScore = 0;
+            jumpCount = 0;
+        }
+
+        function spawnObstacle() {
+            const height = Math.random() * (canvas.height / 4) + 50;
+            obstacles.push({
+                x: canvas.width,
+                y: canvas.height - height,
+                width: 50,
+                height,
+                color: "#555555",
+                glow: "#AAAAAA",
+            });
+        }
+
+        function spawnParticles(x, y, color, amount = 10) {
+            for (let i = 0; i < amount; i++) {
+                particles.push({
+                    x,
+                    y,
+                    radius: Math.random() * 5 + 2,
+                    velocityX: (Math.random() - 0.5) * 4,
+                    velocityY: Math.random() * -2,
+                    color,
+                    life: 50,
+                });
+            }
+        }
+
+        function updateParticles() {
+            particles.forEach((particle, index) => {
+                particle.x += particle.velocityX;
+                particle.y += particle.velocityY;
+                particle.life--;
+
+                if (particle.life <= 0) {
+                    particles.splice(index, 1);
+                }
+
+                ctx.beginPath();
+                ctx.arc(particle.x, particle.y, particle.radius, 0, Math.PI * 2);
+                ctx.fillStyle = particle.color;
+                ctx.shadowColor = particle.color;
+                ctx.shadowBlur = 10;
+                ctx.fill();
+            });
+        }
+
+        function updateGame() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            player.velocityY += gravity;
+            player.y += player.velocityY;
+
+            if (keys.left && player.x > 0) player.x -= 5;
+            if (keys.right && player.x + player.width < canvas.width) player.x += 5;
+
+            if (player.y + player.height > canvas.height) {
+                player.y = canvas.height - player.height;
+                player.velocityY = 0;
+                jumpCount = 0;
+            }
+
+            ctx.fillStyle = player.color;
+            ctx.shadowColor = player.glow;
+            ctx.shadowBlur = 20;
+            ctx.fillRect(player.x, player.y, player.width, player.height);
+
+            // დაბრკოლებები
+            obstacles.forEach((obstacle, index) => {
+                obstacle.x -= 5;
+
+                if (obstacle.x + obstacle.width < 0) {
+                    obstacles.splice(index, 1);
+                    score++;
+                    spawnParticles(obstacle.x + obstacle.width / 2, obstacle.y, "#AAAAAA", 20); // more particles
+                }
+
+                ctx.fillStyle = obstacle.color;
+                ctx.shadowColor = obstacle.glow;
+                ctx.shadowBlur = 15;
+                ctx.fillRect(obstacle.x, obstacle.y, obstacle.width, obstacle.height);
+
+                if (
+                    player.x < obstacle.x + obstacle.width &&
+                    player.x + player.width > obstacle.x &&
+                    player.y < obstacle.y + obstacle.height &&
+                    player.y + player.height > obstacle.y
+                ) {
+                    resetGame();
+                }
+            });
+
+            updateParticles();
+
+            ctx.fillStyle = "#FFFFFF";
+            ctx.font = "20px Arial";
+            ctx.fillText(`ქულა: ${score}`, 10, 30);
+            ctx.fillText(`საუკეთესო ქულა: ${bestScore}`, 10, 60);
+
+            requestAnimationFrame(updateGame);
+        }
+
+        function resetGame() {
+            if (score > bestScore) bestScore = score;
+            player.x = 100;
+            player.y = canvas.height - 100;
+            obstacles.length = 0;
+            particles.length = 0;
+            score = 0;
+            jumpCount = 0;
+        }
+
+        function startGame() {
+            initializeGame();
+            setInterval(spawnObstacle, 1500);
+            updateGame();
+        }
+
+        function handleJump() {
+            if (jumpCount < 2) {
+                player.velocityY = -12;
+                jumpCount++;
+                spawnParticles(player.x + player.width / 2, player.y + player.height, "#FFFFFF", 20); // more particles on jump
+            }
+        }
+
+        leftControl.addEventListener("touchstart", () => (keys.left = true));
+        leftControl.addEventListener("touchend", () => (keys.left = false));
+
+        rightControl.addEventListener("touchstart", () => (keys.right = true));
+        rightControl.addEventListener("touchend", () => (keys.right = false));
+
+        jumpControl.addEventListener("touchstart", () => handleJump());
+
+        document.addEventListener("keydown", (e) => {
+            if (e.key === "ArrowLeft" || e.key === "a") {
+                keys.left = true;
+            }
+            if (e.key === "ArrowRight" || e.key === "d") {
+                keys.right = true;
+            }
+            if (e.key === " " || e.key === "ArrowUp" || e.key === "w") {
+                handleJump();
+            }
+        });
+
+        document.addEventListener("keyup", (e) => {
+            if (e.key === "ArrowLeft" || e.key === "a") {
+                keys.left = false;
+            }
+            if (e.key === "ArrowRight" || e.key === "d") {
+                keys.right = false;
+            }
+        });
+    </script>
+</body>
+</html>
